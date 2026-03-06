@@ -1,0 +1,17 @@
+# Backend
+backend/target/
+backend/application.properties
+backend/test
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/package-lock.json
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
