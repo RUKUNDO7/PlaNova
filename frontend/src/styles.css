@@ -1,0 +1,143 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: #eef3f7;
+  color: #1b2833;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #dce3ea;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.task-form {
+  display: grid;
+  gap: 8px;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #c7d2de;
+}
+
+button {
+  background: #0a6666;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+button.danger {
+  background: #b81f2b;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.controls {
+  display: grid;
+  gap: 8px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filters button {
+  background: #dfe8ef;
+  color: #1b2833;
+}
+
+.filters button.active {
+  background: #0a6666;
+  color: #fff;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+}
+
+.task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task {
+  border: 1px solid #dce3ea;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-body {
+  display: flex;
+  gap: 10px;
+}
+
+.task h3 {
+  margin: 0 0 4px;
+}
+
+.task p {
+  margin: 0 0 6px;
+  color: #4f5f6f;
+}
+
+.task.done h3,
+.task.done p {
+  text-decoration: line-through;
+  color: #7a8894;
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+}
+
+.error {
+  color: #b81f2b;
+}
+
+@media (max-width: 720px) {
+  .app {
+    padding: 12px;
+  }
+
+  .grid-row {
+    grid-template-columns: 1fr;
+  }
+
+  .task {
+    flex-direction: column;
+  }
+}
