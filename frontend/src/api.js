@@ -1,4 +1,4 @@
-const BASE_URL = "/api/tasks";
+﻿const BASE_URL = "/api/tasks";
 
 function toQueryString(params = {}) {
   const searchParams = new URLSearchParams();
@@ -9,6 +9,10 @@ function toQueryString(params = {}) {
   });
   const query = searchParams.toString();
   return query ? `?${query}` : "";
+}
+
+function buildPath(endpoint, context = {}) {
+  return `${endpoint}${toQueryString(context)}`;
 }
 
 async function request(path = "", options = {}) {
@@ -44,11 +48,20 @@ async function request(path = "", options = {}) {
 }
 
 export const taskApi = {
-  list: (params = {}) => request(toQueryString(params)),
-  create: (task) => request("", { method: "POST", body: JSON.stringify(task) }),
-  update: (id, task) => request(`/${id}`, { method: "PUT", body: JSON.stringify(task) }),
-  toggleComplete: (id, completed) =>
-    request(`/${id}/complete`, { method: "PATCH", body: JSON.stringify({ completed }) }),
-  remove: (id) => request(`/${id}`, { method: "DELETE" }),
-  clearCompleted: () => request("/completed", { method: "DELETE" })
+  list: (params = {}, context = {}) => request(buildPath("", { ...params, ...context })),
+  create: (task, context = {}) => request(buildPath("", context), {
+    method: "POST",
+    body: JSON.stringify(task)
+  }),
+  update: (id, task, context = {}) => request(buildPath(`/${id}`, context), {
+    method: "PUT",
+    body: JSON.stringify(task)
+  }),
+  toggleComplete: (id, completed, context = {}) =>
+    request(buildPath(`/${id}/complete`, context), {
+      method: "PATCH",
+      body: JSON.stringify({ completed })
+    }),
+  remove: (id, context = {}) => request(buildPath(`/${id}`, context), { method: "DELETE" }),
+  clearCompleted: (context = {}) => request(buildPath("/completed", context), { method: "DELETE" })
 };
