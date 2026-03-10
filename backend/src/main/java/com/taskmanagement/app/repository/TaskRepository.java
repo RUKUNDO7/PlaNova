@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificationExecutor<Task> {
     long deleteByCompletedTrue();
+    long deleteByCompletedTrueAndOwnerId(Long ownerId);
 }
