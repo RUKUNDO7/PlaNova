@@ -1,7 +1,10 @@
 package com.taskmanagement.app.service;
 
-import com.taskmanagement.app.model.Task;
+import com.taskmanagement.app.dto.TaskRequest;
+import com.taskmanagement.app.model.AppUser;
 import com.taskmanagement.app.model.Priority;
+import com.taskmanagement.app.model.Task;
+import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Sort;
@@ -16,12 +19,15 @@ import java.util.Locale;
 public class TaskService {
 
     private final TaskRepository taskRepository;
+    private final AppUserService appUserService;
 
-    public TaskService(TaskRepository taskRepository) {
+    public TaskService(TaskRepository taskRepository, AppUserService appUserService) {
         this.taskRepository = taskRepository;
+        this.appUserService = appUserService;
     }
 
-    public List<Task> findAll(String status, Priority priority, String q, String sortBy, String direction) {
+    public List<Task> findAll(String status, Priority priority, String q, String sortBy, String direction, UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
         Specification<Task> spec = Specification.where(null);
 
         if (StringUtils.hasText(status)) {
@@ -47,43 +53,112 @@ public class TaskService {
             ));
         }
 
+        spec = applyOwnershipFilter(spec, viewerRole, viewerId);
+
         Sort sort = buildSort(sortBy, direction);
         return taskRepository.findAll(spec, sort);
     }
 
-    public Task findById(Long id) {
-        return taskRepository.findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("Task not found with id " + id));
+    public Task findAccessibleById(Long id, UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
+        Task task = findById(id);
+        ensureAccess(task, viewerRole, viewerId);
+        return task;
     }
 
-    public Task create(Task task) {
-        task.setId(null);
+    public Task create(TaskRequest request, UserRole viewerRole, Long viewerId) {
+        AppUser owner = resolveOwnerForCreate(request.getOwnerId(), viewerRole, viewerId);
+        Task task = new Task();
+        task.setTitle(request.getTitle());
+        task.setDescription(request.getDescription());
+        task.setDueDate(request.getDueDate());
+        task.setPriority(request.getPriority());
+        task.setCompleted(Boolean.TRUE.equals(request.getCompleted()));
+        task.setOwner(owner);
         return taskRepository.save(task);
     }
 
-    public Task update(Long id, Task payload) {
+    public Task update(Long id, TaskRequest request, UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
         Task existing = findById(id);
-        existing.setTitle(payload.getTitle());
-        existing.setDescription(payload.getDescription());
-        existing.setDueDate(payload.getDueDate());
-        existing.setPriority(payload.getPriority());
-        existing.setCompleted(payload.isCompleted());
+        ensureAccess(existing, viewerRole, viewerId);
+        existing.setTitle(request.getTitle());
+        existing.setDescription(request.getDescription());
+        existing.setDueDate(request.getDueDate());
+        existing.setPriority(request.getPriority());
+        if (request.getCompleted() != null) {
+            existing.setCompleted(request.getCompleted());
+        }
+        AppUser owner = resolveOwnerForUpdate(existing, request, viewerRole);
+        existing.setOwner(owner);
         return taskRepository.save(existing);
     }
 
-    public Task toggleComplete(Long id, boolean completed) {
+    public Task toggleComplete(Long id, boolean completed, UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
         Task existing = findById(id);
+        ensureAccess(existing, viewerRole, viewerId);
         existing.setCompleted(completed);
         return taskRepository.save(existing);
     }
 
-    public void delete(Long id) {
+    public void delete(Long id, UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
         Task existing = findById(id);
+        ensureAccess(existing, viewerRole, viewerId);
         taskRepository.delete(existing);
     }
 
-    public long deleteCompleted() {
-        return taskRepository.deleteByCompletedTrue();
+    public long deleteCompleted(UserRole viewerRole, Long viewerId) {
+        ensureViewerContext(viewerRole, viewerId);
+        if (viewerRole == UserRole.ADMIN) {
+            return taskRepository.deleteByCompletedTrue();
+        }
+        return taskRepository.deleteByCompletedTrueAndOwnerId(viewerId);
+    }
+
+    private Task findById(Long id) {
+        return taskRepository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("Task not found with id " + id));
+    }
+
+    private void ensureViewerContext(UserRole viewerRole, Long viewerId) {
+        if (viewerRole == UserRole.USER && viewerId == null) {
+            throw new IllegalArgumentException("ViewerId is required for user role.");
+        }
+    }
+
+    private void ensureAccess(Task task, UserRole viewerRole, Long viewerId) {
+        if (viewerRole == UserRole.USER && !task.getOwner().getId().equals(viewerId)) {
+            throw new IllegalArgumentException("Users can only access their own tasks.");
+        }
+    }
+
+    private Specification<Task> applyOwnershipFilter(Specification<Task> spec, UserRole viewerRole, Long viewerId) {
+        if (viewerRole == UserRole.USER) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("owner").get("id"), viewerId));
+        }
+        return spec;
+    }
+
+    private AppUser resolveOwnerForCreate(Long requestedOwnerId, UserRole viewerRole, Long viewerId) {
+        if (viewerRole == UserRole.ADMIN) {
+            if (requestedOwnerId == null) {
+                throw new IllegalArgumentException("ownerId is required for admin role.");
+            }
+            return appUserService.findById(requestedOwnerId);
+        }
+        if (requestedOwnerId != null && !requestedOwnerId.equals(viewerId)) {
+            throw new IllegalArgumentException("Users can only create tasks for themselves.");
+        }
+        return appUserService.findById(viewerId);
+    }
+
+    private AppUser resolveOwnerForUpdate(Task existing, TaskRequest request, UserRole viewerRole) {
+        if (viewerRole == UserRole.ADMIN && request.getOwnerId() != null && !request.getOwnerId().equals(existing.getOwner().getId())) {
+            return appUserService.findById(request.getOwnerId());
+        }
+        return existing.getOwner();
     }
 
     private Sort buildSort(String sortBy, String direction) {
