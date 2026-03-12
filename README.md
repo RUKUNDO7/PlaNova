@@ -1,69 +1,95 @@
-﻿# Task Management Dashboard
+# PlaNova Task Management Suite
 
-This repository provides a production-grade task management dashboard with:
-- `backend`: REST API and persistence layer
-- `frontend`: browser-based dashboard for task operations
+PlaNova is a full-stack task management workspace with projects, boards, columns, tasks, collaboration, and notifications.
+
+## Stack
+
+- `backend`: Spring Boot 3 / Java 17
+- `frontend`: React + Vite
 
 ## Local Development
 
 ### Backend
+
 Requirements:
 - Java 17+
 - Maven 3.9+
+- PostgreSQL (or override `DB_URL` to use another database)
 
 Run:
-```bash
+```
 cd backend
 mvn spring-boot:run
 ```
 
-Default API base:
-- `http://localhost:8080/api/tasks`
-
-Database console:
-- `http://localhost:8080/h2-console`
-- JDBC URL: `jdbc:h2:mem:taskdb`
-- User: `sa`
-- Password: (empty)
+API base: `http://localhost:8080/api`
 
 ### Frontend
+
 Requirements:
 - Node.js 18+
 
 Run:
-```bash
+```
 cd frontend
 npm install
 npm run dev
 ```
 
-Default dashboard URL:
-- `http://localhost:5173`
+Frontend URL: `http://localhost:5173`
 
-The frontend proxies `/api` requests to `http://localhost:8080`.
+The Vite dev server proxies `/api` requests to `http://localhost:8080`.
 
 ## Authentication
 
-- `POST /api/auth/signup` register with `email`, `password`, and `displayName`; the signed-in role is returned in the payload.
-- `POST /api/auth/login` signs the user in and returns their `id`, `displayName`, `email`, and `role`.
-- Admin privileges are granted only when the email matches `gihozoRukundobenise@gmail.com`; every other account becomes a `USER`.
-- Seeded credentials: admin (`gihozoRukundobenise@gmail.com` / `AdminPass#1`), operations (`ops@task.local` / `OpsPass#1`), marketing (`marketing@task.local` / `MarketPass#1`).
+- `POST /api/auth/signup` register with `email`, `password`, `displayName`.
+- `POST /api/auth/login` returns `id`, `displayName`, `email`, `role`.
 
-## Roles & dashboards
+Seeded credentials:
+- admin: `gihozoRukundobenise@gmail.com` / `AdminPass#1`
+- operations: `ops@task.local` / `OpsPass#1`
+- marketing: `marketing@task.local` / `MarketPass#1`
 
-- Admins can inspect every task, assign ownership, and navigate to each user's personal dashboard.
-- User dashboards trigger `viewerRole=USER&viewerId={userId}`, returning only that user's tasks so they can manage their own workload.
-- Task creation/updating requires an `ownerId` (or defaults to the authenticated viewer when in a user dashboard).
+## Core Endpoints
 
-## API Endpoints
+- `GET /api/users` list users
+- `PUT /api/users/{id}` update profile display name
 
-- `GET /api/users` list the available users (id, email, displayName, role)
-- `POST /api/auth/signup` register a new user (admin only if email matches the configured admin address)
-- `POST /api/auth/login` authenticate and receive the signed-in user payload
-- `GET /api/tasks` list tasks (`viewerRole` defaults to `ADMIN`; include `viewerId` when using `USER`)
-- `GET /api/tasks/{id}` get task by id
-- `POST /api/tasks` create task (submit `ownerId`, `title`, `priority`, etc.)
-- `PUT /api/tasks/{id}` update task (include `ownerId` to reassign)
-- `PATCH /api/tasks/{id}/complete` set completion state
-- `DELETE /api/tasks/{id}` delete task
-- `DELETE /api/tasks/completed` clear completed tasks (respects the viewer context)
+Projects & workspaces:
+- `GET /api/projects`
+- `POST /api/projects`
+- `PUT /api/projects/{id}`
+- `DELETE /api/projects/{id}`
+- `GET /api/projects/{id}/members`
+- `POST /api/projects/{id}/members`
+- `DELETE /api/projects/{id}/members/{memberId}`
+
+Boards & columns:
+- `GET /api/boards?projectId=`
+- `POST /api/boards`
+- `PUT /api/boards/{id}`
+- `DELETE /api/boards/{id}`
+- `GET /api/columns?boardId=`
+- `POST /api/columns`
+- `PUT /api/columns/{id}`
+- `DELETE /api/columns/{id}`
+
+Tasks:
+- `GET /api/tasks?boardId=&projectId=`
+- `POST /api/tasks`
+- `PUT /api/tasks/{id}`
+- `PATCH /api/tasks/{id}/complete`
+- `DELETE /api/tasks/{id}`
+
+Collaboration:
+- `GET /api/tasks/{taskId}/comments`
+- `POST /api/tasks/{taskId}/comments`
+- `GET /api/tasks/{taskId}/attachments`
+- `POST /api/tasks/{taskId}/attachments`
+- `DELETE /api/tasks/{taskId}/attachments/{attachmentId}`
+- `GET /api/tasks/{taskId}/activity`
+
+Notifications:
+- `GET /api/notifications?recipientId=`
+- `PATCH /api/notifications/{id}/read`
+- `PATCH /api/notifications/read-all?recipientId=`
