@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public class TaskRequest {
 
@@ -24,6 +25,10 @@ public class TaskRequest {
     private Boolean completed;
 
     private Long ownerId;
+
+    private Long columnId;
+
+    private List<Long> labelIds;
 
     public String getTitle() {
         return title;
@@ -71,5 +76,21 @@ public class TaskRequest {
 
     public void setOwnerId(Long ownerId) {
         this.ownerId = ownerId;
+    }
+
+    public Long getColumnId() {
+        return columnId;
+    }
+
+    public void setColumnId(Long columnId) {
+        this.columnId = columnId;
+    }
+
+    public List<Long> getLabelIds() {
+        return labelIds;
+    }
+
+    public void setLabelIds(List<Long> labelIds) {
+        this.labelIds = labelIds;
     }
 }
