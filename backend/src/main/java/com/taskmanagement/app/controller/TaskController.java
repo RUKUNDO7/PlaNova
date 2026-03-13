@@ -44,9 +44,13 @@ public class TaskController {
         @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
         @RequestParam(required = false, defaultValue = "desc") String direction,
         @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
+        @RequestParam(required = false) Long viewerId,
+        @RequestParam(required = false) Long projectId,
+        @RequestParam(required = false) Long boardId,
+        @RequestParam(required = false) Long columnId,
+        @RequestParam(required = false) Long labelId
     ) {
-        List<Task> tasks = taskService.findAll(status, priority, q, sortBy, direction, viewerRole, viewerId);
+        List<Task> tasks = taskService.findAll(status, priority, q, sortBy, direction, viewerRole, viewerId, projectId, boardId, columnId, labelId);
         return tasks.stream().map(TaskResponse::from).collect(Collectors.toList());
     }
 
