@@ -63,6 +63,12 @@ public class AppUserService {
             .orElseGet(() -> register(normalized, displayName, rawPassword, role));
     }
 
+    public AppUser updateDisplayName(Long id, String displayName) {
+        AppUser user = findById(id);
+        user.setDisplayName(displayName);
+        return userRepository.save(user);
+    }
+
     private String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
