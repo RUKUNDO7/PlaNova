@@ -30,6 +30,15 @@ public class TaskRequest {
 
     private List<Long> labelIds;
 
+    private List<Long> assigneeIds;
+
+    private Double estimatedHours;
+
+    @Size(max = 100)
+    private String recurrenceRule;
+
+    private Long sprintId;
+
     public String getTitle() {
         return title;
     }
@@ -92,5 +101,37 @@ public class TaskRequest {
 
     public void setLabelIds(List<Long> labelIds) {
         this.labelIds = labelIds;
+    }
+
+    public List<Long> getAssigneeIds() {
+        return assigneeIds;
+    }
+
+    public void setAssigneeIds(List<Long> assigneeIds) {
+        this.assigneeIds = assigneeIds;
+    }
+
+    public Double getEstimatedHours() {
+        return estimatedHours;
+    }
+
+    public void setEstimatedHours(Double estimatedHours) {
+        this.estimatedHours = estimatedHours;
+    }
+
+    public String getRecurrenceRule() {
+        return recurrenceRule;
+    }
+
+    public void setRecurrenceRule(String recurrenceRule) {
+        this.recurrenceRule = recurrenceRule;
+    }
+
+    public Long getSprintId() {
+        return sprintId;
+    }
+
+    public void setSprintId(Long sprintId) {
+        this.sprintId = sprintId;
     }
 }

@@ -17,6 +17,7 @@ public class TaskResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private boolean completed;
+    private boolean archived;
     private String priority;
     private Long ownerId;
     private String ownerName;
@@ -25,7 +26,13 @@ public class TaskResponse {
     private String columnName;
     private Long boardId;
     private Long projectId;
+    private Double estimatedHours;
+    private String recurrenceRule;
+    private SprintResponse sprint;
+    private List<Long> dependencyIds;
     private List<LabelResponse> labels;
+    private List<SubtaskResponse> subtasks;
+    private List<UserSummaryResponse> assignees;
 
     public static TaskResponse from(Task task) {
         TaskResponse response = new TaskResponse();
@@ -36,10 +43,18 @@ public class TaskResponse {
         response.createdAt = task.getCreatedAt();
         response.updatedAt = task.getUpdatedAt();
         response.completed = task.isCompleted();
+        response.archived = task.isArchived();
         response.priority = task.getPriority().name();
         response.ownerId = task.getOwner().getId();
         response.ownerName = task.getOwner().getDisplayName();
         response.ownerRole = task.getOwner().getRole();
+        response.estimatedHours = task.getEstimatedHours();
+        response.recurrenceRule = task.getRecurrenceRule();
+        
+        if (task.getSprint() != null) {
+            response.sprint = SprintResponse.from(task.getSprint());
+        }
+        
         if (task.getColumn() != null) {
             response.columnId = task.getColumn().getId();
             response.columnName = task.getColumn().getName();
@@ -48,6 +63,15 @@ public class TaskResponse {
         }
         response.labels = task.getLabels().stream()
             .map(LabelResponse::from)
+            .collect(Collectors.toList());
+        response.assignees = task.getAssignees().stream()
+            .map(UserSummaryResponse::from)
+            .collect(Collectors.toList());
+        response.subtasks = task.getSubtasks().stream()
+            .map(SubtaskResponse::from)
+            .collect(Collectors.toList());
+        response.dependencyIds = task.getDependencies().stream()
+            .map(Task::getId)
             .collect(Collectors.toList());
         return response;
     }
@@ -78,6 +102,10 @@ public class TaskResponse {
 
     public boolean isCompleted() {
         return completed;
+    }
+
+    public boolean isArchived() {
+        return archived;
     }
 
     public String getPriority() {
@@ -114,5 +142,29 @@ public class TaskResponse {
 
     public List<LabelResponse> getLabels() {
         return labels;
+    }
+
+    public List<UserSummaryResponse> getAssignees() {
+        return assignees;
+    }
+
+    public Double getEstimatedHours() {
+        return estimatedHours;
+    }
+
+    public String getRecurrenceRule() {
+        return recurrenceRule;
+    }
+
+    public SprintResponse getSprint() {
+        return sprint;
+    }
+
+    public List<Long> getDependencyIds() {
+        return dependencyIds;
+    }
+
+    public List<SubtaskResponse> getSubtasks() {
+        return subtasks;
     }
 }

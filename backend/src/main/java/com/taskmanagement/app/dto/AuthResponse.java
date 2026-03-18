@@ -9,13 +9,16 @@ public class AuthResponse {
     private String email;
     private String displayName;
     private UserRole role;
+    private String token;
+    private String type = "Bearer";
 
-    public static AuthResponse from(AppUser user) {
+    public static AuthResponse from(AppUser user, String token) {
         AuthResponse response = new AuthResponse();
         response.id = user.getId();
         response.email = user.getEmail();
         response.displayName = user.getDisplayName();
         response.role = user.getRole();
+        response.token = token;
         return response;
     }
 
@@ -33,5 +36,13 @@ public class AuthResponse {
 
     public UserRole getRole() {
         return role;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public String getType() {
+        return type;
     }
 }
