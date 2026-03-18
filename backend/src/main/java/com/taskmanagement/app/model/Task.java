@@ -60,6 +60,14 @@ public class Task {
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
+        name = "task_assignees",
+        joinColumns = @JoinColumn(name = "task_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<AppUser> assignees = new HashSet<>();
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
         name = "task_label_map",
         joinColumns = @JoinColumn(name = "task_id"),
         inverseJoinColumns = @JoinColumn(name = "label_id")
@@ -69,11 +77,38 @@ public class Task {
     @Column(nullable = false)
     private boolean completed = false;
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sprint_id")
+    private Sprint sprint;
+
+    @Column
+    private Double estimatedHours;
+
+    @Column(length = 100)
+    private String recurrenceRule;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "task_dependencies",
+        joinColumns = @JoinColumn(name = "task_id"),
+        inverseJoinColumns = @JoinColumn(name = "depends_on_id")
+    )
+    private Set<Task> dependencies = new HashSet<>();
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Subtask> subtasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TimeEntry> timeEntries = new ArrayList<>();
 
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TaskComment> comments = new ArrayList<>();
@@ -151,6 +186,14 @@ public class Task {
         this.column = column;
     }
 
+    public Set<AppUser> getAssignees() {
+        return assignees;
+    }
+
+    public void setAssignees(Set<AppUser> assignees) {
+        this.assignees = assignees;
+    }
+
     public Set<TaskLabel> getLabels() {
         return labels;
     }
@@ -165,6 +208,14 @@ public class Task {
 
     public void setCompleted(boolean completed) {
         this.completed = completed;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -206,4 +257,22 @@ public class Task {
     public void setActivities(List<TaskActivity> activities) {
         this.activities = activities;
     }
+
+    public Sprint getSprint() { return sprint; }
+    public void setSprint(Sprint sprint) { this.sprint = sprint; }
+
+    public Double getEstimatedHours() { return estimatedHours; }
+    public void setEstimatedHours(Double estimatedHours) { this.estimatedHours = estimatedHours; }
+
+    public String getRecurrenceRule() { return recurrenceRule; }
+    public void setRecurrenceRule(String recurrenceRule) { this.recurrenceRule = recurrenceRule; }
+
+    public Set<Task> getDependencies() { return dependencies; }
+    public void setDependencies(Set<Task> dependencies) { this.dependencies = dependencies; }
+
+    public List<Subtask> getSubtasks() { return subtasks; }
+    public void setSubtasks(List<Subtask> subtasks) { this.subtasks = subtasks; }
+
+    public List<TimeEntry> getTimeEntries() { return timeEntries; }
+    public void setTimeEntries(List<TimeEntry> timeEntries) { this.timeEntries = timeEntries; }
 }

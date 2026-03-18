@@ -48,6 +48,9 @@ public class Project {
     )
     private Set<AppUser> members = new HashSet<>();
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -94,6 +97,14 @@ public class Project {
 
     public void setMembers(Set<AppUser> members) {
         this.members = members;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public LocalDateTime getCreatedAt() {
