@@ -9,8 +9,9 @@ import com.taskmanagement.app.model.Priority;
 import com.taskmanagement.app.model.Project;
 import com.taskmanagement.app.model.Task;
 import com.taskmanagement.app.model.TaskLabel;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.BoardColumnRepository;
+import com.taskmanagement.app.security.SecurityService;
+import com.taskmanagement.app.repository.SprintRepository;
 import com.taskmanagement.app.repository.TaskLabelRepository;
 import com.taskmanagement.app.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -35,6 +36,8 @@ public class TaskService {
     private final ColumnService columnService;
     private final NotificationService notificationService;
     private final ActivityService activityService;
+    private final SprintRepository sprintRepository;
+    private final SecurityService securityService;
 
     public TaskService(TaskRepository taskRepository,
                        AppUserService appUserService,
@@ -43,7 +46,9 @@ public class TaskService {
                        ProjectService projectService,
                        ColumnService columnService,
                        NotificationService notificationService,
-                       ActivityService activityService) {
+                       ActivityService activityService,
+                       SprintRepository sprintRepository,
+                       SecurityService securityService) {
         this.taskRepository = taskRepository;
         this.appUserService = appUserService;
         this.columnRepository = columnRepository;
@@ -52,6 +57,8 @@ public class TaskService {
         this.columnService = columnService;
         this.notificationService = notificationService;
         this.activityService = activityService;
+        this.sprintRepository = sprintRepository;
+        this.securityService = securityService;
     }
 
     public List<Task> findAll(String status,
@@ -59,14 +66,19 @@ public class TaskService {
                               String q,
                               String sortBy,
                               String direction,
-                              UserRole viewerRole,
-                              Long viewerId,
                               Long projectId,
                               Long boardId,
                               Long columnId,
-                              Long labelId) {
-        ensureViewerContext(viewerRole, viewerId);
+                              Long labelId,
+                              Boolean archived) {
         Specification<Task> spec = Specification.where(null);
+
+        if (archived != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("archived"), archived));
+        } else {
+            // By default, don't show archived tasks unless requested
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("archived"), false));
+        }
 
         if (StringUtils.hasText(status)) {
             String normalizedStatus = status.toLowerCase(Locale.ROOT);
@@ -93,9 +105,9 @@ public class TaskService {
 
         if (projectId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.join("column").join("board").join("project").get("id"), projectId));
-            if (viewerRole == UserRole.USER) {
+            if (!securityService.isAdmin()) {
                 Project project = projectService.findById(projectId);
-                projectService.ensureAccess(project, viewerRole, viewerId);
+                projectService.ensureAccess(project);
             }
         }
 
@@ -114,24 +126,23 @@ public class TaskService {
             });
         }
 
-        spec = applyOwnershipFilter(spec, viewerRole, viewerId, projectId);
+        spec = applyOwnershipFilter(spec, projectId);
 
         Sort sort = buildSort(sortBy, direction);
         return taskRepository.findAll(spec, sort);
     }
 
-    public Task findAccessibleById(Long id, UserRole viewerRole, Long viewerId) {
-        ensureViewerContext(viewerRole, viewerId);
+    public Task findAccessibleById(Long id) {
         Task task = findById(id);
-        ensureAccess(task, viewerRole, viewerId);
+        ensureAccess(task);
         return task;
     }
 
-    public Task create(TaskRequest request, UserRole viewerRole, Long viewerId) {
-        AppUser owner = resolveOwnerForCreate(request.getOwnerId(), viewerRole, viewerId);
+    public Task create(TaskRequest request) {
+        AppUser owner = resolveOwnerForCreate(request.getOwnerId());
         BoardColumn column = resolveColumn(request.getColumnId());
         Project project = projectFromColumn(column);
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         ensureProjectMember(owner, project);
 
         Task task = new Task();
@@ -142,6 +153,14 @@ public class TaskService {
         task.setOwner(owner);
         task.setColumn(column);
         task.setLabels(resolveLabels(request.getLabelIds(), project));
+        task.setAssignees(resolveAssignees(request.getAssigneeIds(), project));
+        task.setEstimatedHours(request.getEstimatedHours());
+        task.setRecurrenceRule(request.getRecurrenceRule());
+        
+        if (request.getSprintId() != null) {
+            task.setSprint(sprintRepository.findById(request.getSprintId())
+                .orElseThrow(() -> new EntityNotFoundException("Sprint not found")));
+        }
 
         boolean completed = Boolean.TRUE.equals(request.getCompleted());
         if (column != null && column.getStatus() == ColumnStatus.DONE) {
@@ -152,29 +171,43 @@ public class TaskService {
         Task saved = taskRepository.save(task);
         activityService.log(saved, "Task created", "TASK");
 
-        notifyAssignment(saved, viewerRole, viewerId, owner);
+        notifyAssignment(saved, owner);
+        for (AppUser assignee : saved.getAssignees()) {
+            if (!assignee.getId().equals(owner.getId())) {
+                notifyAssignment(saved, assignee);
+            }
+        }
         return saved;
     }
 
-    public Task update(Long id, TaskRequest request, UserRole viewerRole, Long viewerId) {
-        ensureViewerContext(viewerRole, viewerId);
+    public Task update(Long id, TaskRequest request) {
         Task existing = findById(id);
-        ensureAccess(existing, viewerRole, viewerId);
+        ensureAccess(existing);
 
         BoardColumn column = resolveColumn(request.getColumnId());
         Project project = projectFromColumn(column != null ? column : existing.getColumn());
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
 
         AppUser previousOwner = existing.getOwner();
         existing.setTitle(request.getTitle());
         existing.setDescription(request.getDescription());
         existing.setDueDate(request.getDueDate());
         existing.setPriority(request.getPriority());
+        existing.setEstimatedHours(request.getEstimatedHours());
+        existing.setRecurrenceRule(request.getRecurrenceRule());
+        
+        if (request.getSprintId() != null) {
+            existing.setSprint(sprintRepository.findById(request.getSprintId())
+                .orElseThrow(() -> new EntityNotFoundException("Sprint not found")));
+        } else {
+            existing.setSprint(null);
+        }
+
         if (request.getCompleted() != null) {
             existing.setCompleted(request.getCompleted());
         }
 
-        AppUser owner = resolveOwnerForUpdate(existing, request, viewerRole);
+        AppUser owner = resolveOwnerForUpdate(existing, request);
         ensureProjectMember(owner, project);
         existing.setOwner(owner);
 
@@ -186,6 +219,10 @@ public class TaskService {
         }
 
         existing.setLabels(resolveLabels(request.getLabelIds(), project));
+        
+        Set<AppUser> newAssignees = resolveAssignees(request.getAssigneeIds(), project);
+        Set<AppUser> currentAssignees = existing.getAssignees();
+        existing.setAssignees(newAssignees);
 
         Task saved = taskRepository.save(existing);
 
@@ -196,6 +233,12 @@ public class TaskService {
             activityService.log(saved, "Reassigned to " + owner.getDisplayName(), "ASSIGN");
             notificationService.create(owner, NotificationType.ASSIGNMENT, "You were assigned to " + saved.getTitle(), saved);
         }
+        
+        for (AppUser assignee : newAssignees) {
+            if (!currentAssignees.contains(assignee)) {
+                notificationService.create(assignee, NotificationType.ASSIGNMENT, "You were assigned to " + saved.getTitle(), saved);
+            }
+        }
         if (request.getCompleted() != null && request.getCompleted()) {
             notificationService.create(owner, NotificationType.COMPLETED, "Task completed: " + saved.getTitle(), saved);
         }
@@ -203,10 +246,9 @@ public class TaskService {
         return saved;
     }
 
-    public Task toggleComplete(Long id, boolean completed, UserRole viewerRole, Long viewerId) {
-        ensureViewerContext(viewerRole, viewerId);
+    public Task toggleComplete(Long id, boolean completed) {
         Task existing = findById(id);
-        ensureAccess(existing, viewerRole, viewerId);
+        ensureAccess(existing);
         existing.setCompleted(completed);
 
         if (existing.getColumn() != null) {
@@ -229,19 +271,44 @@ public class TaskService {
         return saved;
     }
 
-    public void delete(Long id, UserRole viewerRole, Long viewerId) {
-        ensureViewerContext(viewerRole, viewerId);
+    public void delete(Long id) {
         Task existing = findById(id);
-        ensureAccess(existing, viewerRole, viewerId);
+        ensureAccess(existing);
         taskRepository.delete(existing);
     }
 
-    public long deleteCompleted(UserRole viewerRole, Long viewerId) {
-        ensureViewerContext(viewerRole, viewerId);
-        if (viewerRole == UserRole.ADMIN) {
+    public Task addDependency(Long taskId, Long dependsOnId) {
+        Task task = findById(taskId);
+        Task dependsOn = findById(dependsOnId);
+        ensureAccess(task);
+        ensureAccess(dependsOn);
+
+        if (task.getId().equals(dependsOn.getId())) {
+            throw new IllegalArgumentException("Task cannot depend on itself");
+        }
+
+        task.getDependencies().add(dependsOn);
+        Task saved = taskRepository.save(task);
+        activityService.log(saved, "Added dependency on: " + dependsOn.getTitle(), "DEPENDENCY");
+        return saved;
+    }
+
+    public Task removeDependency(Long taskId, Long dependsOnId) {
+        Task task = findById(taskId);
+        Task dependsOn = findById(dependsOnId);
+        ensureAccess(task);
+        
+        task.getDependencies().remove(dependsOn);
+        Task saved = taskRepository.save(task);
+        activityService.log(saved, "Removed dependency on: " + dependsOn.getTitle(), "DEPENDENCY");
+        return saved;
+    }
+
+    public long deleteCompleted() {
+        if (securityService.isAdmin()) {
             return taskRepository.deleteByCompletedTrue();
         }
-        return taskRepository.deleteByCompletedTrueAndOwnerId(viewerId);
+        return taskRepository.deleteByCompletedTrueAndOwnerId(securityService.getCurrentUserId());
     }
 
     private Task findById(Long id) {
@@ -249,48 +316,45 @@ public class TaskService {
             .orElseThrow(() -> new EntityNotFoundException("Task not found with id " + id));
     }
 
-    private void ensureViewerContext(UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.USER && viewerId == null) {
-            throw new IllegalArgumentException("ViewerId is required for user role.");
-        }
-    }
 
-    private void ensureAccess(Task task, UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.ADMIN) {
+    private void ensureAccess(Task task) {
+        if (securityService.isAdmin()) {
             return;
         }
-        if (viewerId == null) {
-            throw new IllegalArgumentException("ViewerId is required for user role.");
+        Long userId = securityService.getCurrentUserId();
+        if (task.getOwner() != null && task.getOwner().getId().equals(userId)) {
+            return;
         }
-        if (task.getOwner() != null && task.getOwner().getId().equals(viewerId)) {
+        if (task.getAssignees().stream().anyMatch(u -> u.getId().equals(userId))) {
             return;
         }
         Project project = projectFromColumn(task.getColumn());
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
     }
 
-    private Specification<Task> applyOwnershipFilter(Specification<Task> spec, UserRole viewerRole, Long viewerId, Long projectId) {
-        if (viewerRole == UserRole.USER && projectId == null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("owner").get("id"), viewerId));
+    private Specification<Task> applyOwnershipFilter(Specification<Task> spec, Long projectId) {
+        if (!securityService.isAdmin() && projectId == null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("owner").get("id"), securityService.getCurrentUserId()));
         }
         return spec;
     }
 
-    private AppUser resolveOwnerForCreate(Long requestedOwnerId, UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.ADMIN) {
+    private AppUser resolveOwnerForCreate(Long requestedOwnerId) {
+        Long currentUserId = securityService.getCurrentUserId();
+        if (securityService.isAdmin()) {
             if (requestedOwnerId == null) {
-                throw new IllegalArgumentException("ownerId is required for admin role.");
+                return appUserService.findById(currentUserId);
             }
             return appUserService.findById(requestedOwnerId);
         }
-        if (requestedOwnerId != null && !requestedOwnerId.equals(viewerId)) {
+        if (requestedOwnerId != null && !requestedOwnerId.equals(currentUserId)) {
             throw new IllegalArgumentException("Users can only create tasks for themselves.");
         }
-        return appUserService.findById(viewerId);
+        return appUserService.findById(currentUserId);
     }
 
-    private AppUser resolveOwnerForUpdate(Task existing, TaskRequest request, UserRole viewerRole) {
-        if (viewerRole == UserRole.ADMIN && request.getOwnerId() != null && !request.getOwnerId().equals(existing.getOwner().getId())) {
+    private AppUser resolveOwnerForUpdate(Task existing, TaskRequest request) {
+        if (securityService.isAdmin() && request.getOwnerId() != null && !request.getOwnerId().equals(existing.getOwner().getId())) {
             return appUserService.findById(request.getOwnerId());
         }
         return existing.getOwner();
@@ -317,6 +381,19 @@ public class TaskService {
         return labels;
     }
 
+    private Set<AppUser> resolveAssignees(List<Long> assigneeIds, Project project) {
+        if (assigneeIds == null) {
+            return new HashSet<>();
+        }
+        Set<AppUser> assignees = new HashSet<>();
+        for (Long id : assigneeIds) {
+            AppUser user = appUserService.findById(id);
+            ensureProjectMember(user, project);
+            assignees.add(user);
+        }
+        return assignees;
+    }
+
     private Project projectFromColumn(BoardColumn column) {
         if (column == null || column.getBoard() == null) {
             throw new IllegalArgumentException("Task must belong to a board column.");
@@ -332,8 +409,9 @@ public class TaskService {
         }
     }
 
-    private void notifyAssignment(Task task, UserRole viewerRole, Long viewerId, AppUser owner) {
-        if (viewerRole == UserRole.USER && viewerId != null && owner.getId().equals(viewerId)) {
+    private void notifyAssignment(Task task, AppUser owner) {
+        Long userId = securityService.getCurrentUserId();
+        if (owner.getId().equals(userId)) {
             return;
         }
         notificationService.create(owner, NotificationType.ASSIGNMENT, "You were assigned to " + task.getTitle(), task);

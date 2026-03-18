@@ -6,7 +6,7 @@ import com.taskmanagement.app.model.NotificationType;
 import com.taskmanagement.app.model.Project;
 import com.taskmanagement.app.model.Task;
 import com.taskmanagement.app.model.TaskComment;
-import com.taskmanagement.app.model.UserRole;
+import com.taskmanagement.app.security.SecurityService;
 import com.taskmanagement.app.repository.TaskCommentRepository;
 import com.taskmanagement.app.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,33 +25,36 @@ public class CommentService {
     private final ProjectService projectService;
     private final ActivityService activityService;
     private final NotificationService notificationService;
+    private final SecurityService securityService;
 
     public CommentService(TaskCommentRepository commentRepository,
                           TaskRepository taskRepository,
                           AppUserService appUserService,
                           ProjectService projectService,
                           ActivityService activityService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          SecurityService securityService) {
         this.commentRepository = commentRepository;
         this.taskRepository = taskRepository;
         this.appUserService = appUserService;
         this.projectService = projectService;
         this.activityService = activityService;
         this.notificationService = notificationService;
+        this.securityService = securityService;
     }
 
-    public List<TaskComment> list(Long taskId, UserRole viewerRole, Long viewerId) {
+    public List<TaskComment> list(Long taskId) {
         Task task = findTask(taskId);
         Project project = getProject(task);
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         return commentRepository.findByTaskIdOrderByCreatedAtDesc(taskId);
     }
 
-    public TaskComment create(Long taskId, CommentRequest request, UserRole viewerRole, Long viewerId) {
+    public TaskComment create(Long taskId, CommentRequest request) {
         Task task = findTask(taskId);
         Project project = getProject(task);
-        projectService.ensureAccess(project, viewerRole, viewerId);
-        AppUser author = resolveAuthor(request.getAuthorId(), viewerRole, viewerId);
+        projectService.ensureAccess(project);
+        AppUser author = resolveAuthor(request.getAuthorId());
 
         TaskComment comment = new TaskComment();
         comment.setTask(task);
@@ -96,19 +99,17 @@ public class CommentService {
         return task.getColumn().getBoard().getProject();
     }
 
-    private AppUser resolveAuthor(Long authorId, UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.ADMIN) {
+    private AppUser resolveAuthor(Long authorId) {
+        Long currentUserId = securityService.getCurrentUserId();
+        if (securityService.isAdmin()) {
             if (authorId == null) {
-                throw new IllegalArgumentException("authorId is required for admin role.");
+                return appUserService.findById(currentUserId);
             }
             return appUserService.findById(authorId);
         }
-        if (viewerId == null) {
-            throw new IllegalArgumentException("viewerId is required for user role.");
-        }
-        if (authorId != null && !authorId.equals(viewerId)) {
+        if (authorId != null && !authorId.equals(currentUserId)) {
             throw new IllegalArgumentException("Users can only comment as themselves.");
         }
-        return appUserService.findById(viewerId);
+        return appUserService.findById(currentUserId);
     }
 }

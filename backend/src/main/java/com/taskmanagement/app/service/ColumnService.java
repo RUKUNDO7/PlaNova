@@ -4,7 +4,6 @@ import com.taskmanagement.app.dto.ColumnRequest;
 import com.taskmanagement.app.model.Board;
 import com.taskmanagement.app.model.BoardColumn;
 import com.taskmanagement.app.model.ColumnStatus;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.BoardColumnRepository;
 import com.taskmanagement.app.repository.BoardRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,9 +24,9 @@ public class ColumnService {
         this.projectService = projectService;
     }
 
-    public List<BoardColumn> listByBoard(Long boardId, UserRole viewerRole, Long viewerId) {
+    public List<BoardColumn> listByBoard(Long boardId) {
         Board board = findBoard(boardId);
-        projectService.ensureAccess(board.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(board.getProject());
         return columnRepository.findByBoardIdOrderByPositionAsc(boardId);
     }
 
@@ -36,12 +35,12 @@ public class ColumnService {
             .orElseThrow(() -> new EntityNotFoundException("Column not found with id " + id));
     }
 
-    public BoardColumn create(ColumnRequest request, UserRole viewerRole, Long viewerId) {
+    public BoardColumn create(ColumnRequest request) {
         if (request.getBoardId() == null) {
             throw new IllegalArgumentException("boardId is required.");
         }
         Board board = findBoard(request.getBoardId());
-        projectService.ensureAccess(board.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(board.getProject());
         BoardColumn column = new BoardColumn();
         column.setName(request.getName());
         column.setBoard(board);
@@ -51,9 +50,9 @@ public class ColumnService {
         return columnRepository.save(column);
     }
 
-    public BoardColumn update(Long id, ColumnRequest request, UserRole viewerRole, Long viewerId) {
+    public BoardColumn update(Long id, ColumnRequest request) {
         BoardColumn column = findById(id);
-        projectService.ensureAccess(column.getBoard().getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(column.getBoard().getProject());
         column.setName(request.getName());
         if (request.getStatus() != null) {
             column.setStatus(request.getStatus());
@@ -64,9 +63,9 @@ public class ColumnService {
         return columnRepository.save(column);
     }
 
-    public void delete(Long id, UserRole viewerRole, Long viewerId) {
+    public void delete(Long id) {
         BoardColumn column = findById(id);
-        projectService.ensureAccess(column.getBoard().getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(column.getBoard().getProject());
         columnRepository.delete(column);
     }
 

@@ -3,7 +3,6 @@ package com.taskmanagement.app.service;
 import com.taskmanagement.app.dto.LabelRequest;
 import com.taskmanagement.app.model.Project;
 import com.taskmanagement.app.model.TaskLabel;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.TaskLabelRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
@@ -21,9 +20,9 @@ public class LabelService {
         this.projectService = projectService;
     }
 
-    public List<TaskLabel> listByProject(Long projectId, UserRole viewerRole, Long viewerId) {
+    public List<TaskLabel> listByProject(Long projectId) {
         Project project = projectService.findById(projectId);
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         return labelRepository.findByProjectIdOrderByNameAsc(projectId);
     }
 
@@ -32,12 +31,12 @@ public class LabelService {
             .orElseThrow(() -> new EntityNotFoundException("Label not found with id " + id));
     }
 
-    public TaskLabel create(LabelRequest request, UserRole viewerRole, Long viewerId) {
+    public TaskLabel create(LabelRequest request) {
         if (request.getProjectId() == null) {
             throw new IllegalArgumentException("projectId is required.");
         }
         Project project = projectService.findById(request.getProjectId());
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         TaskLabel label = new TaskLabel();
         label.setName(request.getName());
         label.setColor(normalizeColor(request.getColor()));
@@ -45,17 +44,17 @@ public class LabelService {
         return labelRepository.save(label);
     }
 
-    public TaskLabel update(Long id, LabelRequest request, UserRole viewerRole, Long viewerId) {
+    public TaskLabel update(Long id, LabelRequest request) {
         TaskLabel label = findById(id);
-        projectService.ensureAccess(label.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(label.getProject());
         label.setName(request.getName());
         label.setColor(normalizeColor(request.getColor()));
         return labelRepository.save(label);
     }
 
-    public void delete(Long id, UserRole viewerRole, Long viewerId) {
+    public void delete(Long id) {
         TaskLabel label = findById(id);
-        projectService.ensureAccess(label.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(label.getProject());
         labelRepository.delete(label);
     }
 

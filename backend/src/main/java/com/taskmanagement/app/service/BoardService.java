@@ -3,7 +3,6 @@ package com.taskmanagement.app.service;
 import com.taskmanagement.app.dto.BoardRequest;
 import com.taskmanagement.app.model.Board;
 import com.taskmanagement.app.model.Project;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.BoardRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
@@ -21,9 +20,9 @@ public class BoardService {
         this.projectService = projectService;
     }
 
-    public List<Board> listByProject(Long projectId, UserRole viewerRole, Long viewerId) {
+    public List<Board> listByProject(Long projectId) {
         Project project = projectService.findById(projectId);
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         return boardRepository.findByProjectIdOrderByPositionAsc(projectId);
     }
 
@@ -32,12 +31,12 @@ public class BoardService {
             .orElseThrow(() -> new EntityNotFoundException("Board not found with id " + id));
     }
 
-    public Board create(BoardRequest request, UserRole viewerRole, Long viewerId) {
+    public Board create(BoardRequest request) {
         if (request.getProjectId() == null) {
             throw new IllegalArgumentException("projectId is required.");
         }
         Project project = projectService.findById(request.getProjectId());
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         Board board = new Board();
         board.setName(request.getName());
         board.setProject(project);
@@ -46,9 +45,9 @@ public class BoardService {
         return boardRepository.save(board);
     }
 
-    public Board update(Long id, BoardRequest request, UserRole viewerRole, Long viewerId) {
+    public Board update(Long id, BoardRequest request) {
         Board board = findById(id);
-        projectService.ensureAccess(board.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(board.getProject());
         board.setName(request.getName());
         if (request.getPosition() != null) {
             board.setPosition(request.getPosition());
@@ -56,9 +55,9 @@ public class BoardService {
         return boardRepository.save(board);
     }
 
-    public void delete(Long id, UserRole viewerRole, Long viewerId) {
+    public void delete(Long id) {
         Board board = findById(id);
-        projectService.ensureAccess(board.getProject(), viewerRole, viewerId);
+        projectService.ensureAccess(board.getProject());
         boardRepository.delete(board);
     }
 }

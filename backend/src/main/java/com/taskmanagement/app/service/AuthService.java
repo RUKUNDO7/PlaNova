@@ -5,9 +5,12 @@ import com.taskmanagement.app.dto.LoginRequest;
 import com.taskmanagement.app.dto.SignupRequest;
 import com.taskmanagement.app.model.AppUser;
 import com.taskmanagement.app.model.UserRole;
-import jakarta.persistence.EntityNotFoundException;
+import com.taskmanagement.app.security.JwtUtils;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
@@ -16,14 +19,17 @@ import java.util.Locale;
 public class AuthService {
 
     private final AppUserService appUserService;
-    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtils jwtUtils;
     private final String adminEmail;
 
     public AuthService(AppUserService appUserService,
-                       PasswordEncoder passwordEncoder,
-                       @Value("${app.admin.email:gihozoRukundobenise@gmail.com}") String adminEmail) {
+                       AuthenticationManager authenticationManager,
+                       JwtUtils jwtUtils,
+                       @Value("${app.admin.email}") String adminEmail) {
         this.appUserService = appUserService;
-        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtUtils = jwtUtils;
         this.adminEmail = adminEmail;
     }
 
@@ -31,16 +37,27 @@ public class AuthService {
         String normalizedEmail = normalize(request.getEmail());
         UserRole role = isAdminEmail(normalizedEmail) ? UserRole.ADMIN : UserRole.USER;
         AppUser user = appUserService.register(normalizedEmail, request.getDisplayName(), request.getPassword(), role);
-        return AuthResponse.from(user);
+        
+        // Auto-login after signup to get token
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        return AuthResponse.from(user, jwt);
     }
 
     public AuthResponse login(LoginRequest request) {
         String normalizedEmail = normalize(request.getEmail());
-        AppUser stored = appUserService.findByEmail(normalizedEmail);
-        if (!passwordEncoder.matches(request.getPassword(), stored.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid credentials.");
-        }
-        return AuthResponse.from(stored);
+        
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword()));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        AppUser user = appUserService.findByEmail(normalizedEmail);
+        return AuthResponse.from(user, jwt);
     }
 
     public AppUser ensureAdminUser(String displayName, String password) {

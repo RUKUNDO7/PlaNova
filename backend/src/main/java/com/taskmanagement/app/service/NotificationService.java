@@ -5,6 +5,7 @@ import com.taskmanagement.app.model.Notification;
 import com.taskmanagement.app.model.NotificationType;
 import com.taskmanagement.app.model.Task;
 import com.taskmanagement.app.repository.NotificationRepository;
+import com.taskmanagement.app.security.SecurityService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -14,9 +15,11 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final SecurityService securityService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository, SecurityService securityService) {
         this.notificationRepository = notificationRepository;
+        this.securityService = securityService;
     }
 
     public Notification create(AppUser recipient, NotificationType type, String message, Task task) {
@@ -28,21 +31,24 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
-    public List<Notification> list(Long recipientId) {
+    public List<Notification> list() {
+        Long recipientId = securityService.getCurrentUserId();
         return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId);
     }
 
-    public Notification markRead(Long id, Long recipientId) {
+    public Notification markRead(Long id) {
         Notification notification = notificationRepository.findById(id)
             .orElseThrow(() -> new EntityNotFoundException("Notification not found with id " + id));
-        if (!notification.getRecipient().getId().equals(recipientId)) {
+        Long currentUserId = securityService.getCurrentUserId();
+        if (!notification.getRecipient().getId().equals(currentUserId) && !securityService.isAdmin()) {
             throw new IllegalArgumentException("Cannot update notifications for another user.");
         }
         notification.setRead(true);
         return notificationRepository.save(notification);
     }
 
-    public int markAllRead(Long recipientId) {
+    public int markAllRead() {
+        Long recipientId = securityService.getCurrentUserId();
         List<Notification> notifications = notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId);
         int updated = 0;
         for (Notification notification : notifications) {

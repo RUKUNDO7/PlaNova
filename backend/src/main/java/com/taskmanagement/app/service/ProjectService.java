@@ -3,8 +3,8 @@ package com.taskmanagement.app.service;
 import com.taskmanagement.app.dto.ProjectRequest;
 import com.taskmanagement.app.model.AppUser;
 import com.taskmanagement.app.model.Project;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.repository.ProjectRepository;
+import com.taskmanagement.app.security.SecurityService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -17,18 +17,18 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final AppUserService appUserService;
+    private final SecurityService securityService;
 
-    public ProjectService(ProjectRepository projectRepository, AppUserService appUserService) {
+    public ProjectService(ProjectRepository projectRepository, AppUserService appUserService, SecurityService securityService) {
         this.projectRepository = projectRepository;
         this.appUserService = appUserService;
+        this.securityService = securityService;
     }
 
-    public List<Project> list(UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.USER) {
-            if (viewerId == null) {
-                throw new IllegalArgumentException("viewerId is required for user role.");
-            }
-            return projectRepository.findDistinctByMembers_IdOrOwner_Id(viewerId, viewerId);
+    public List<Project> list() {
+        if (!securityService.isAdmin()) {
+            Long userId = securityService.getCurrentUserId();
+            return projectRepository.findDistinctByMembers_IdOrOwner_Id(userId, userId);
         }
         return projectRepository.findAll();
     }
@@ -38,8 +38,8 @@ public class ProjectService {
             .orElseThrow(() -> new EntityNotFoundException("Project not found with id " + id));
     }
 
-    public Project create(ProjectRequest request, UserRole viewerRole, Long viewerId) {
-        AppUser owner = resolveOwner(request.getOwnerId(), viewerRole, viewerId);
+    public Project create(ProjectRequest request) {
+        AppUser owner = resolveOwner(request.getOwnerId());
         Project project = new Project();
         project.setName(request.getName());
         project.setDescription(request.getDescription());
@@ -53,9 +53,9 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    public Project update(Long id, ProjectRequest request, UserRole viewerRole, Long viewerId) {
+    public Project update(Long id, ProjectRequest request) {
         Project project = findById(id);
-        ensureAccess(project, viewerRole, viewerId);
+        ensureAccess(project);
         project.setName(request.getName());
         project.setDescription(request.getDescription());
         if (request.getMemberIds() != null) {
@@ -66,57 +66,50 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    public void delete(Long id, UserRole viewerRole, Long viewerId) {
+    public void delete(Long id) {
         Project project = findById(id);
-        ensureAccess(project, viewerRole, viewerId);
+        ensureAccess(project);
         projectRepository.delete(project);
     }
 
-    public Project addMember(Long projectId, Long memberId, UserRole viewerRole, Long viewerId) {
+    public Project addMember(Long projectId, Long memberId) {
         Project project = findById(projectId);
-        ensureAccess(project, viewerRole, viewerId);
+        ensureAccess(project);
         AppUser member = appUserService.findById(memberId);
         project.getMembers().add(member);
         return projectRepository.save(project);
     }
 
-    public Project removeMember(Long projectId, Long memberId, UserRole viewerRole, Long viewerId) {
+    public Project removeMember(Long projectId, Long memberId) {
         Project project = findById(projectId);
-        ensureAccess(project, viewerRole, viewerId);
+        ensureAccess(project);
         project.getMembers().removeIf(user -> user.getId().equals(memberId));
         return projectRepository.save(project);
     }
 
-    public void ensureAccess(Project project, UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.ADMIN) {
+    public void ensureAccess(Project project) {
+        if (securityService.isAdmin()) {
             return;
         }
-        if (viewerId == null) {
-            throw new IllegalArgumentException("viewerId is required for user role.");
-        }
-        boolean member = project.getOwner().getId().equals(viewerId)
-            || project.getMembers().stream().anyMatch(user -> user.getId().equals(viewerId));
+        Long userId = securityService.getCurrentUserId();
+        boolean member = project.getOwner().getId().equals(userId)
+            || project.getMembers().stream().anyMatch(user -> user.getId().equals(userId));
         if (!member) {
             throw new IllegalArgumentException("You do not have access to this project.");
         }
     }
 
-    private AppUser resolveOwner(Long requestedOwnerId, UserRole viewerRole, Long viewerId) {
-        if (viewerRole == UserRole.ADMIN) {
-            if (requestedOwnerId == null && viewerId != null) {
-                return appUserService.findById(viewerId);
-            }
+    private AppUser resolveOwner(Long requestedOwnerId) {
+        Long currentUserId = securityService.getCurrentUserId();
+        if (securityService.isAdmin()) {
             if (requestedOwnerId == null) {
-                throw new IllegalArgumentException("ownerId is required for admin role.");
+                return appUserService.findById(currentUserId);
             }
             return appUserService.findById(requestedOwnerId);
         }
-        if (viewerId == null) {
-            throw new IllegalArgumentException("viewerId is required for user role.");
-        }
-        if (requestedOwnerId != null && !requestedOwnerId.equals(viewerId)) {
+        if (requestedOwnerId != null && !requestedOwnerId.equals(currentUserId)) {
             throw new IllegalArgumentException("Users can only create projects for themselves.");
         }
-        return appUserService.findById(viewerId);
+        return appUserService.findById(currentUserId);
     }
 }
