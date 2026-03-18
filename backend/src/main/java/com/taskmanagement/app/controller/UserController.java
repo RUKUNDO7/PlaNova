@@ -3,6 +3,7 @@ package com.taskmanagement.app.controller;
 import com.taskmanagement.app.dto.ProfileUpdateRequest;
 import com.taskmanagement.app.dto.UserSummaryResponse;
 import com.taskmanagement.app.model.AppUser;
+import com.taskmanagement.app.security.SecurityService;
 import com.taskmanagement.app.service.AppUserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,9 +25,11 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private final AppUserService appUserService;
+    private final SecurityService securityService;
 
-    public UserController(AppUserService appUserService) {
+    public UserController(AppUserService appUserService, SecurityService securityService) {
         this.appUserService = appUserService;
+        this.securityService = securityService;
     }
 
     @GetMapping
@@ -36,9 +39,19 @@ public class UserController {
             .collect(Collectors.toList());
     }
 
+    @GetMapping("/me")
+    public UserSummaryResponse getCurrentUser() {
+        AppUser user = appUserService.findById(securityService.getCurrentUserId());
+        return UserSummaryResponse.from(user);
+    }
+
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public UserSummaryResponse updateProfile(@PathVariable Long id, @Valid @RequestBody ProfileUpdateRequest request) {
+        Long currentUserId = securityService.getCurrentUserId();
+        if (!id.equals(currentUserId) && !securityService.isAdmin()) {
+            throw new IllegalArgumentException("You can only update your own profile.");
+        }
         AppUser updated = appUserService.updateDisplayName(id, request.getDisplayName());
         return UserSummaryResponse.from(updated);
     }

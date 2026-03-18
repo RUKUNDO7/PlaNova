@@ -4,7 +4,6 @@ import com.taskmanagement.app.dto.TaskRequest;
 import com.taskmanagement.app.dto.TaskResponse;
 import com.taskmanagement.app.model.Priority;
 import com.taskmanagement.app.model.Task;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.TaskService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -43,77 +42,63 @@ public class TaskController {
         @RequestParam(required = false) String q,
         @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
         @RequestParam(required = false, defaultValue = "desc") String direction,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId,
         @RequestParam(required = false) Long projectId,
         @RequestParam(required = false) Long boardId,
         @RequestParam(required = false) Long columnId,
-        @RequestParam(required = false) Long labelId
+        @RequestParam(required = false) Long labelId,
+        @RequestParam(required = false) Boolean archived
     ) {
-        List<Task> tasks = taskService.findAll(status, priority, q, sortBy, direction, viewerRole, viewerId, projectId, boardId, columnId, labelId);
+        List<Task> tasks = taskService.findAll(status, priority, q, sortBy, direction, projectId, boardId, columnId, labelId, archived);
         return tasks.stream().map(TaskResponse::from).collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public TaskResponse getById(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Task task = taskService.findAccessibleById(id, viewerRole, viewerId);
+    public TaskResponse getById(@PathVariable Long id) {
+        Task task = taskService.findAccessibleById(id);
         return TaskResponse.from(task);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TaskResponse create(
-        @Valid @RequestBody TaskRequest taskRequest,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Task created = taskService.create(taskRequest, viewerRole, viewerId);
+    public TaskResponse create(@Valid @RequestBody TaskRequest taskRequest) {
+        Task created = taskService.create(taskRequest);
         return TaskResponse.from(created);
     }
 
     @PutMapping("/{id}")
-    public TaskResponse update(
-        @PathVariable Long id,
-        @Valid @RequestBody TaskRequest taskRequest,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Task updated = taskService.update(id, taskRequest, viewerRole, viewerId);
+    public TaskResponse update(@PathVariable Long id, @Valid @RequestBody TaskRequest taskRequest) {
+        Task updated = taskService.update(id, taskRequest);
         return TaskResponse.from(updated);
     }
 
     @PatchMapping("/{id}/complete")
-    public TaskResponse toggleComplete(
-        @PathVariable Long id,
-        @RequestBody Map<String, Boolean> payload,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
+    public TaskResponse toggleComplete(@PathVariable Long id, @RequestBody Map<String, Boolean> payload) {
         boolean completed = payload.getOrDefault("completed", false);
-        Task updated = taskService.toggleComplete(id, completed, viewerRole, viewerId);
+        Task updated = taskService.toggleComplete(id, completed);
         return TaskResponse.from(updated);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        taskService.delete(id, viewerRole, viewerId);
+    public void delete(@PathVariable Long id) {
+        taskService.delete(id);
+    }
+
+    @PostMapping("/{id}/dependencies/{dependsOnId}")
+    public TaskResponse addDependency(@PathVariable Long id, @PathVariable Long dependsOnId) {
+        Task t = taskService.addDependency(id, dependsOnId);
+        return TaskResponse.from(t);
+    }
+
+    @DeleteMapping("/{id}/dependencies/{dependsOnId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeDependency(@PathVariable Long id, @PathVariable Long dependsOnId) {
+        taskService.removeDependency(id, dependsOnId);
     }
 
     @DeleteMapping("/completed")
-    public Map<String, Long> clearCompleted(
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        long deleted = taskService.deleteCompleted(viewerRole, viewerId);
+    public Map<String, Long> clearCompleted() {
+        long deleted = taskService.deleteCompleted();
         return Map.of("deleted", deleted);
     }
 }

@@ -3,7 +3,6 @@ package com.taskmanagement.app.controller;
 import com.taskmanagement.app.dto.BoardRequest;
 import com.taskmanagement.app.dto.BoardResponse;
 import com.taskmanagement.app.model.Board;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.BoardService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -34,45 +33,28 @@ public class BoardController {
     }
 
     @GetMapping
-    public List<BoardResponse> list(
-        @RequestParam Long projectId,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        return boardService.listByProject(projectId, viewerRole, viewerId).stream()
+    public List<BoardResponse> list(@RequestParam Long projectId) {
+        return boardService.listByProject(projectId).stream()
             .map(BoardResponse::from)
             .collect(Collectors.toList());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public BoardResponse create(
-        @Valid @RequestBody BoardRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Board created = boardService.create(request, viewerRole, viewerId);
+    public BoardResponse create(@Valid @RequestBody BoardRequest request) {
+        Board created = boardService.create(request);
         return BoardResponse.from(created);
     }
 
     @PutMapping("/{id}")
-    public BoardResponse update(
-        @PathVariable Long id,
-        @Valid @RequestBody BoardRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Board updated = boardService.update(id, request, viewerRole, viewerId);
+    public BoardResponse update(@PathVariable Long id, @Valid @RequestBody BoardRequest request) {
+        Board updated = boardService.update(id, request);
         return BoardResponse.from(updated);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        boardService.delete(id, viewerRole, viewerId);
+    public void delete(@PathVariable Long id) {
+        boardService.delete(id);
     }
 }

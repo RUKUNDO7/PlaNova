@@ -3,7 +3,6 @@ package com.taskmanagement.app.controller;
 import com.taskmanagement.app.dto.LabelRequest;
 import com.taskmanagement.app.dto.LabelResponse;
 import com.taskmanagement.app.model.TaskLabel;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.LabelService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -34,45 +33,28 @@ public class LabelController {
     }
 
     @GetMapping
-    public List<LabelResponse> list(
-        @RequestParam Long projectId,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        return labelService.listByProject(projectId, viewerRole, viewerId).stream()
+    public List<LabelResponse> list(@RequestParam Long projectId) {
+        return labelService.listByProject(projectId).stream()
             .map(LabelResponse::from)
             .collect(Collectors.toList());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public LabelResponse create(
-        @Valid @RequestBody LabelRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        TaskLabel created = labelService.create(request, viewerRole, viewerId);
+    public LabelResponse create(@Valid @RequestBody LabelRequest request) {
+        TaskLabel created = labelService.create(request);
         return LabelResponse.from(created);
     }
 
     @PutMapping("/{id}")
-    public LabelResponse update(
-        @PathVariable Long id,
-        @Valid @RequestBody LabelRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        TaskLabel updated = labelService.update(id, request, viewerRole, viewerId);
+    public LabelResponse update(@PathVariable Long id, @Valid @RequestBody LabelRequest request) {
+        TaskLabel updated = labelService.update(id, request);
         return LabelResponse.from(updated);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        labelService.delete(id, viewerRole, viewerId);
+    public void delete(@PathVariable Long id) {
+        labelService.delete(id);
     }
 }

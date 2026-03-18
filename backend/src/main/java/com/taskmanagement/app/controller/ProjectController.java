@@ -4,7 +4,6 @@ import com.taskmanagement.app.dto.ProjectRequest;
 import com.taskmanagement.app.dto.ProjectResponse;
 import com.taskmanagement.app.dto.UserSummaryResponse;
 import com.taskmanagement.app.model.Project;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.ProjectService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,83 +34,53 @@ public class ProjectController {
     }
 
     @GetMapping
-    public List<ProjectResponse> list(
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        return projectService.list(viewerRole, viewerId).stream()
+    public List<ProjectResponse> list() {
+        return projectService.list().stream()
             .map(ProjectResponse::from)
             .collect(Collectors.toList());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ProjectResponse create(
-        @Valid @RequestBody ProjectRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Project created = projectService.create(request, viewerRole, viewerId);
+    public ProjectResponse create(@Valid @RequestBody ProjectRequest request) {
+        Project created = projectService.create(request);
         return ProjectResponse.from(created);
     }
 
     @PutMapping("/{id}")
-    public ProjectResponse update(
-        @PathVariable Long id,
-        @Valid @RequestBody ProjectRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Project updated = projectService.update(id, request, viewerRole, viewerId);
+    public ProjectResponse update(@PathVariable Long id, @Valid @RequestBody ProjectRequest request) {
+        Project updated = projectService.update(id, request);
         return ProjectResponse.from(updated);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        projectService.delete(id, viewerRole, viewerId);
+    public void delete(@PathVariable Long id) {
+        projectService.delete(id);
     }
 
     @GetMapping("/{id}/members")
-    public List<UserSummaryResponse> members(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
+    public List<UserSummaryResponse> members(@PathVariable Long id) {
         Project project = projectService.findById(id);
-        projectService.ensureAccess(project, viewerRole, viewerId);
+        projectService.ensureAccess(project);
         return project.getMembers().stream()
             .map(UserSummaryResponse::from)
             .collect(Collectors.toList());
     }
 
     @PostMapping("/{id}/members")
-    public ProjectResponse addMember(
-        @PathVariable Long id,
-        @RequestBody Map<String, Long> payload,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
+    public ProjectResponse addMember(@PathVariable Long id, @RequestBody Map<String, Long> payload) {
         Long memberId = payload.get("userId");
         if (memberId == null) {
             throw new IllegalArgumentException("userId is required.");
         }
-        Project updated = projectService.addMember(id, memberId, viewerRole, viewerId);
+        Project updated = projectService.addMember(id, memberId);
         return ProjectResponse.from(updated);
     }
 
     @DeleteMapping("/{id}/members/{memberId}")
-    public ProjectResponse removeMember(
-        @PathVariable Long id,
-        @PathVariable Long memberId,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Project updated = projectService.removeMember(id, memberId, viewerRole, viewerId);
+    public ProjectResponse removeMember(@PathVariable Long id, @PathVariable Long memberId) {
+        Project updated = projectService.removeMember(id, memberId);
         return ProjectResponse.from(updated);
     }
 }

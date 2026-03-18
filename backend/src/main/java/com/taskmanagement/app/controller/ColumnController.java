@@ -3,7 +3,6 @@ package com.taskmanagement.app.controller;
 import com.taskmanagement.app.dto.ColumnRequest;
 import com.taskmanagement.app.dto.ColumnResponse;
 import com.taskmanagement.app.model.BoardColumn;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.ColumnService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -34,45 +33,28 @@ public class ColumnController {
     }
 
     @GetMapping
-    public List<ColumnResponse> list(
-        @RequestParam Long boardId,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        return columnService.listByBoard(boardId, viewerRole, viewerId).stream()
+    public List<ColumnResponse> list(@RequestParam Long boardId) {
+        return columnService.listByBoard(boardId).stream()
             .map(ColumnResponse::from)
             .collect(Collectors.toList());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ColumnResponse create(
-        @Valid @RequestBody ColumnRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        BoardColumn created = columnService.create(request, viewerRole, viewerId);
+    public ColumnResponse create(@Valid @RequestBody ColumnRequest request) {
+        BoardColumn created = columnService.create(request);
         return ColumnResponse.from(created);
     }
 
     @PutMapping("/{id}")
-    public ColumnResponse update(
-        @PathVariable Long id,
-        @Valid @RequestBody ColumnRequest request,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        BoardColumn updated = columnService.update(id, request, viewerRole, viewerId);
+    public ColumnResponse update(@PathVariable Long id, @Valid @RequestBody ColumnRequest request) {
+        BoardColumn updated = columnService.update(id, request);
         return ColumnResponse.from(updated);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-        @PathVariable Long id,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        columnService.delete(id, viewerRole, viewerId);
+    public void delete(@PathVariable Long id) {
+        columnService.delete(id);
     }
 }

@@ -2,14 +2,12 @@ package com.taskmanagement.app.controller;
 
 import com.taskmanagement.app.dto.ActivityResponse;
 import com.taskmanagement.app.model.Task;
-import com.taskmanagement.app.model.UserRole;
 import com.taskmanagement.app.service.ActivityService;
 import com.taskmanagement.app.service.TaskService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -29,12 +27,8 @@ public class ActivityController {
     }
 
     @GetMapping
-    public List<ActivityResponse> list(
-        @PathVariable Long taskId,
-        @RequestParam(required = false, defaultValue = "ADMIN") UserRole viewerRole,
-        @RequestParam(required = false) Long viewerId
-    ) {
-        Task task = taskService.findAccessibleById(taskId, viewerRole, viewerId);
+    public List<ActivityResponse> list(@PathVariable Long taskId) {
+        Task task = taskService.findAccessibleById(taskId);
         return activityService.listForTask(task.getId()).stream()
             .map(ActivityResponse::from)
             .collect(Collectors.toList());
