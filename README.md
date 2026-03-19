@@ -1,95 +1,43 @@
-# PlaNova Task Management Suite
+# PlaNova
 
-PlaNova is a full-stack task management workspace with projects, boards, columns, tasks, collaboration, and notifications.
+A full-stack task management workspace for organizing projects with boards, columns, tasks, team collaboration, and real-time notifications.
 
-## Stack
+## Tech Stack
 
-- `backend`: Spring Boot 3 / Java 17
-- `frontend`: React + Vite
+| Layer    | Technology                |
+|----------|---------------------------|
+| Backend  | Spring Boot 3 · Java 17   |
+| Database | PostgreSQL                |
+| Auth     | Spring Security · JWT     |
 
-## Local Development
+## Getting Started
+
+### Prerequisites
+
+- Java 17+
+- Maven 3.9+
+- Node.js 18+
+- PostgreSQL
 
 ### Backend
 
-Requirements:
-- Java 17+
-- Maven 3.9+
-- PostgreSQL (or override `DB_URL` to use another database)
-
-Run:
-```
+```bash
 cd backend
 mvn spring-boot:run
 ```
 
-API base: `http://localhost:8080/api`
+API available at `http://localhost:8080/api`
 
-### Frontend
 
-Requirements:
-- Node.js 18+
+## Features
 
-Run:
-```
-cd frontend
-npm install
-npm run dev
-```
+- **Projects & Workspaces** — create projects and manage team members
+- **Boards & Columns** — Kanban-style boards with customizable columns
+- **Tasks** — create, assign, and track tasks across boards
+- **Collaboration** — comments, file attachments, and activity logs on tasks
+- **Notifications** — stay updated on task changes and team activity
+- **Authentication** — secure signup/login with role-based access control
 
-Frontend URL: `http://localhost:5173`
+## License
 
-The Vite dev server proxies `/api` requests to `http://localhost:8080`.
-
-## Authentication
-
-- `POST /api/auth/signup` register with `email`, `password`, `displayName`.
-- `POST /api/auth/login` returns `id`, `displayName`, `email`, `role`.
-
-Seeded credentials:
-- admin: `gihozoRukundobenise@gmail.com` / `AdminPass#1`
-- operations: `ops@task.local` / `OpsPass#1`
-- marketing: `marketing@task.local` / `MarketPass#1`
-
-## Core Endpoints
-
-- `GET /api/users` list users
-- `PUT /api/users/{id}` update profile display name
-
-Projects & workspaces:
-- `GET /api/projects`
-- `POST /api/projects`
-- `PUT /api/projects/{id}`
-- `DELETE /api/projects/{id}`
-- `GET /api/projects/{id}/members`
-- `POST /api/projects/{id}/members`
-- `DELETE /api/projects/{id}/members/{memberId}`
-
-Boards & columns:
-- `GET /api/boards?projectId=`
-- `POST /api/boards`
-- `PUT /api/boards/{id}`
-- `DELETE /api/boards/{id}`
-- `GET /api/columns?boardId=`
-- `POST /api/columns`
-- `PUT /api/columns/{id}`
-- `DELETE /api/columns/{id}`
-
-Tasks:
-- `GET /api/tasks?boardId=&projectId=`
-- `POST /api/tasks`
-- `PUT /api/tasks/{id}`
-- `PATCH /api/tasks/{id}/complete`
-- `DELETE /api/tasks/{id}`
-
-Collaboration:
-- `GET /api/tasks/{taskId}/comments`
-- `POST /api/tasks/{taskId}/comments`
-- `GET /api/tasks/{taskId}/attachments`
-- `POST /api/tasks/{taskId}/attachments`
-- `DELETE /api/tasks/{taskId}/attachments/{attachmentId}`
-- `GET /api/tasks/{taskId}/activity`
-
-Notifications:
-- `GET /api/notifications?recipientId=`
-- `PATCH /api/notifications/{id}/read`
-- `PATCH /api/notifications/read-all?recipientId=`
+This project is for educational and personal use.
