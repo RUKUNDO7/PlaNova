@@ -8,6 +8,7 @@ import com.taskmanagement.app.repository.CustomFieldDefinitionRepository;
 import com.taskmanagement.app.repository.CustomFieldValueRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -48,11 +49,12 @@ public class CustomFieldService {
         def.setRequired(required);
         return definitionRepository.save(def);
     }
-
+    @Transactional
     public void deleteDefinition(Long definitionId) {
         CustomFieldDefinition def = definitionRepository.findById(definitionId)
             .orElseThrow(() -> new EntityNotFoundException("Field definition not found"));
         projectService.ensureAccess(def.getProject());
+        valueRepository.deleteByDefinitionId(definitionId);
         definitionRepository.delete(def);
     }
 
