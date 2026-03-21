@@ -10,14 +10,18 @@ import com.taskmanagement.app.model.Project;
 import com.taskmanagement.app.model.Task;
 import com.taskmanagement.app.model.TaskLabel;
 import com.taskmanagement.app.repository.BoardColumnRepository;
+import com.taskmanagement.app.repository.NotificationRepository;
 import com.taskmanagement.app.security.SecurityService;
 import com.taskmanagement.app.repository.SprintRepository;
 import com.taskmanagement.app.repository.TaskLabelRepository;
 import com.taskmanagement.app.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Fetch;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.HashSet;
@@ -35,6 +39,7 @@ public class TaskService {
     private final ProjectService projectService;
     private final ColumnService columnService;
     private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
     private final ActivityService activityService;
     private final SprintRepository sprintRepository;
     private final SecurityService securityService;
@@ -46,6 +51,7 @@ public class TaskService {
                        ProjectService projectService,
                        ColumnService columnService,
                        NotificationService notificationService,
+                       NotificationRepository notificationRepository,
                        ActivityService activityService,
                        SprintRepository sprintRepository,
                        SecurityService securityService) {
@@ -56,6 +62,7 @@ public class TaskService {
         this.projectService = projectService;
         this.columnService = columnService;
         this.notificationService = notificationService;
+        this.notificationRepository = notificationRepository;
         this.activityService = activityService;
         this.sprintRepository = sprintRepository;
         this.securityService = securityService;
@@ -128,8 +135,36 @@ public class TaskService {
 
         spec = applyOwnershipFilter(spec, projectId);
 
+        // Ensure all associations required for API serialization are fetched while the
+        // persistence context is open (open-in-view is disabled).
+        spec = spec.and(fetchAssociations());
+
         Sort sort = buildSort(sortBy, direction);
         return taskRepository.findAll(spec, sort);
+    }
+
+    private Specification<Task> fetchAssociations() {
+        return (root, query, cb) -> {
+            // Avoid fetch joins for count queries.
+            Class<?> resultType = query.getResultType();
+            if (resultType != Long.class && resultType != long.class) {
+                root.fetch("owner", JoinType.LEFT);
+
+                Fetch<Object, Object> columnFetch = root.fetch("column", JoinType.LEFT);
+                Fetch<Object, Object> boardFetch = columnFetch.fetch("board", JoinType.LEFT);
+                boardFetch.fetch("project", JoinType.LEFT);
+
+                root.fetch("labels", JoinType.LEFT);
+                root.fetch("assignees", JoinType.LEFT);
+                root.fetch("subtasks", JoinType.LEFT);
+                root.fetch("dependencies", JoinType.LEFT);
+                root.fetch("sprint", JoinType.LEFT);
+
+                query.distinct(true);
+            }
+
+            return cb.conjunction();
+        };
     }
 
     public Task findAccessibleById(Long id) {
@@ -297,25 +332,38 @@ public class TaskService {
         Task task = findById(taskId);
         Task dependsOn = findById(dependsOnId);
         ensureAccess(task);
-        
+
         task.getDependencies().remove(dependsOn);
         Task saved = taskRepository.save(task);
         activityService.log(saved, "Removed dependency on: " + dependsOn.getTitle(), "DEPENDENCY");
         return saved;
     }
 
+    @Transactional
     public long deleteCompleted() {
+        List<Long> taskIds;
+        long deleted;
         if (securityService.isAdmin()) {
-            return taskRepository.deleteByCompletedTrue();
+            taskIds = taskRepository.findIdsByCompletedTrue();
+            if (!taskIds.isEmpty()) {
+                notificationRepository.deleteByTaskIds(taskIds);
+            }
+            deleted = taskRepository.deleteByCompletedTrue();
+        } else {
+            Long ownerId = securityService.getCurrentUserId();
+            taskIds = taskRepository.findIdsByCompletedTrueAndOwnerId(ownerId);
+            if (!taskIds.isEmpty()) {
+                notificationRepository.deleteByTaskIds(taskIds);
+            }
+            deleted = taskRepository.deleteByCompletedTrueAndOwnerId(ownerId);
         }
-        return taskRepository.deleteByCompletedTrueAndOwnerId(securityService.getCurrentUserId());
+        return deleted;
     }
 
     private Task findById(Long id) {
-        return taskRepository.findById(id)
+        return taskRepository.findWithAssociationsById(id)
             .orElseThrow(() -> new EntityNotFoundException("Task not found with id " + id));
     }
-
 
     private void ensureAccess(Task task) {
         if (securityService.isAdmin()) {
