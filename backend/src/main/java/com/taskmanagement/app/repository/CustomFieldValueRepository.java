@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface CustomFieldValueRepository extends JpaRepository<CustomFieldValue, Long> {
     List<CustomFieldValue> findByTaskId(Long taskId);
     Optional<CustomFieldValue> findByTaskIdAndDefinitionId(Long taskId, Long definitionId);
+    long deleteByDefinitionId(Long definitionId);
 }
