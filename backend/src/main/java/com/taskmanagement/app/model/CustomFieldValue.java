@@ -34,7 +34,7 @@ public class CustomFieldValue {
     private Task task;
 
     @Size(max = 500)
-    @Column(length = 500)
+    @Column(name = "field_value", length = 500)
     private String value;
 
     @Column(nullable = false, updatable = false)
